@@ -1,7 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
-import { BN, Program, web3 } from "@coral-xyz/anchor";
+import { BN, web3 } from "@coral-xyz/anchor";
 import { assert } from "chai";
-import fs from "fs";
 
 describe("Test Minter", () => {
   // Metaplex Constants

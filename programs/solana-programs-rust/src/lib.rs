@@ -5,10 +5,10 @@ use anchor_spl::{
         create_metadata_accounts_v3, mpl_token_metadata::types::DataV2, CreateMetadataAccountsV3,
         Metadata as Metaplex,
     },
-    token::{mint_to, Mint, MintTo, Token, TokenAccount},
+    token::{mint_to, transfer, Mint, MintTo, Token, TokenAccount, Transfer},
 };
 
-declare_id!("11111111");
+declare_id!("6owdsQPWyvv9CnGAvquGzg4xQN6RPR589tH8BYoznF1e");
 
 #[program]
 mod token_minter {
@@ -43,6 +43,8 @@ mod token_minter {
 
         create_metadata_accounts_v3(metadata_ctx, token_data, false, true, None)?;
 
+        msg!("Token mint created successfully.");
+
         Ok(())
     }
 
@@ -63,6 +65,23 @@ mod token_minter {
             quantity,
         )?;
 
+        Ok(())
+    }
+
+    pub fn transfer_tokens(ctx: Context<TransferTokens>, amount: u64) -> Result<()> {
+        let destination = &ctx.accounts.to_ata;
+        let source = &ctx.accounts.from_ata;
+        let token_program = &ctx.accounts.token_program;
+        let authority = &ctx.accounts.from;
+
+        let cpi_accounts = Transfer {
+            from: source.to_account_info().clone(),
+            to: destination.to_account_info().clone(),
+            authority: authority.to_account_info().clone(),
+        };
+        let cpi_program = token_program.to_account_info();
+
+        transfer(CpiContext::new(cpi_program, cpi_accounts), amount)?;
         Ok(())
     }
 }
@@ -93,6 +112,15 @@ pub struct InitToken<'info> {
     pub token_metadata_program: Program<'info, Metaplex>,
 }
 
+// Define the init token params
+#[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone)]
+pub struct InitTokenParams {
+    pub name: String,
+    pub symbol: String,
+    pub uri: String,
+    pub decimals: u8,
+}
+
 #[derive(Accounts)]
 pub struct MintTokens<'info> {
     #[account(
@@ -117,11 +145,12 @@ pub struct MintTokens<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-// Define the init token params
-#[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone)]
-pub struct InitTokenParams {
-    pub name: String,
-    pub symbol: String,
-    pub uri: String,
-    pub decimals: u8,
+#[derive(Accounts)]
+pub struct TransferTokens<'info> {
+    pub from: Signer<'info>,
+    #[account(mut)]
+    pub from_ata: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub to_ata: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
 }
