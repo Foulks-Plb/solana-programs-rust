@@ -1,27 +1,31 @@
 import * as anchor from "@coral-xyz/anchor";
 import { BN, web3 } from "@coral-xyz/anchor";
 import { assert } from "chai";
+import { TokenMinter } from "../target/types/token_minter";
 
 describe("Test Minter", () => {
+  
   // Metaplex Constants
   const METADATA_SEED = "metadata";
-  const TOKEN_METADATA_PROGRAM_ID = new web3.PublicKey("");
+  const TOKEN_METADATA_PROGRAM_ID = new web3.PublicKey("6owdsQPWyvv9CnGAvquGzg4xQN6RPR589tH8BYoznF1e");
+
+  const pg = anchor.workspace.Minter as anchor.Program<TokenMinter>;
   
   // Constants from our program
   const MINT_SEED = "mint";
 
   // Data for our tests
-  const payer = pg.wallet.publicKey;
+  const payer = pg.provider.publicKey;
   const metadata = {
     name: "TEST V1",
     symbol: "TEST1",
-    uri: "", // TODO
+    uri: "",
     decimals: 9,
   };
   const mintAmount = 10;
   const [mint] = web3.PublicKey.findProgramAddressSync(
     [Buffer.from(MINT_SEED)],
-    pg.PROGRAM_ID
+    pg.programId
   );
 
   const [metadataAddress] = web3.PublicKey.findProgramAddressSync(
@@ -35,7 +39,7 @@ describe("Test Minter", () => {
 
   // Test init token
   it("initialize", async () => {
-    const info = await pg.connection.getAccountInfo(mint);
+    const info = await pg.provider.connection.getAccountInfo(mint);
     if (info) {
       return; // Do not attempt to initialize if already initialized
     }
@@ -51,14 +55,13 @@ describe("Test Minter", () => {
       tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
     };
 
-    const txHash = await pg.program.methods
+    const txHash = await pg.methods
       .initToken(metadata)
       .accounts(context)
       .rpc();
 
-    await pg.connection.confirmTransaction(txHash, "finalized");
     console.log(`  https://explorer.solana.com/tx/${txHash}?cluster=devnet`);
-    const newInfo = await pg.connection.getAccountInfo(mint);
+    const newInfo = await pg.provider.connection.getAccountInfo(mint);
     assert(newInfo, "  Mint should be initialized.");
   });
 
@@ -71,7 +74,7 @@ describe("Test Minter", () => {
 
     let initialBalance: number;
     try {
-      const balance = await pg.connection.getTokenAccountBalance(destination);
+      const balance = await pg.provider.connection.getTokenAccountBalance(destination);
       initialBalance = balance.value.uiAmount;
     } catch {
       // Token account not yet initiated has 0 balance
@@ -88,15 +91,14 @@ describe("Test Minter", () => {
       associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
     };
 
-    const txHash = await pg.program.methods
+    const txHash = await pg.methods
       .mintTokens(new BN(mintAmount * 10 ** metadata.decimals))
       .accounts(context)
       .rpc();
-    await pg.connection.confirmTransaction(txHash);
     console.log(`  https://explorer.solana.com/tx/${txHash}?cluster=devnet`);
 
     const postBalance = (
-      await pg.connection.getTokenAccountBalance(destination)
+      await pg.provider.connection.getTokenAccountBalance(destination)
     ).value.uiAmount;
     assert.equal(
       initialBalance + mintAmount,
